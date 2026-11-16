@@ -1,0 +1,57 @@
+{
+  "name_prefix": {
+    "ui:title": "Name Prefix",
+    "ui:description": "Prefix for all resource names"
+  },
+  "location": {
+    "ui:title": "Location",
+    "ui:description": "Azure location"
+  },
+  "advanced_settings": {
+    "show_advanced_settings": {
+      "ui:title": "Show advanced settings"
+    },
+    "vnet_cidr": {
+      "ui:title": "VNet CIDR"
+    },
+    "subnet_newbits": {
+      "ui:title": "Subnet Newbits"
+    },
+    "enable_nat_gateway": {
+      "ui:title": "Enable NAT Gateway"
+    },
+    "enable_flow_logs": {
+      "ui:title": "Enable Flow Logs"
+    },
+    "flow_log_retention_days": {
+      "ui:title": "Flow Log Retention Days"
+    },
+    "network_watcher_name": {
+      "ui:title": "Network Watcher Name"
+    },
+    "network_watcher_resource_group": {
+      "ui:title": "Network Watcher Resource Group"
+    },
+    "tags": {
+      "ui:title": "Tags"
+    },
+    "ui:order": [
+      "show_advanced_settings",
+      "vnet_cidr",
+      "subnet_newbits",
+      "enable_nat_gateway",
+      "enable_flow_logs",
+      "flow_log_retention_days",
+      "network_watcher_name",
+      "network_watcher_resource_group",
+      "tags"
+    ],
+    "ui:title": "Advanced Settings",
+    "ui:description": "Optional settings, most deployments keep the defaults"
+  },
+  "ui:order": [
+    "name_prefix",
+    "location",
+    "advanced_settings"
+  ]
+}

@@ -1,0 +1,270 @@
+{
+  "type": "object",
+  "required": [],
+  "properties": {
+    "name_prefix": {
+      "type": "string",
+      "default": "demo",
+      "pattern": "^[a-z][a-z0-9-]{1,15}$"
+    },
+    "location": {
+      "type": "string",
+      "default": "germanywestcentral",
+      "enum": [
+        "australiacentral",
+        "australiacentral2",
+        "australiaeast",
+        "australiasoutheast",
+        "austriaeast",
+        "belgiumcentral",
+        "brazilsouth",
+        "brazilsoutheast",
+        "canadacentral",
+        "canadaeast",
+        "centralindia",
+        "centralus",
+        "chilecentral",
+        "denmarkeast",
+        "eastasia",
+        "eastus",
+        "eastus2",
+        "francecentral",
+        "francesouth",
+        "germanynorth",
+        "germanywestcentral",
+        "indonesiacentral",
+        "israelcentral",
+        "italynorth",
+        "japaneast",
+        "japanwest",
+        "jioindiacentral",
+        "jioindiawest",
+        "koreacentral",
+        "koreasouth",
+        "malaysiawest",
+        "mexicocentral",
+        "newzealandnorth",
+        "northcentralus",
+        "northeurope",
+        "norwayeast",
+        "norwaywest",
+        "polandcentral",
+        "qatarcentral",
+        "southafricanorth",
+        "southafricawest",
+        "southcentralus",
+        "southindia",
+        "southeastasia",
+        "spaincentral",
+        "swedencentral",
+        "swedensouth",
+        "switzerlandnorth",
+        "switzerlandwest",
+        "uaecentral",
+        "uaenorth",
+        "uksouth",
+        "ukwest",
+        "westcentralus",
+        "westeurope",
+        "westindia",
+        "westus",
+        "westus2",
+        "westus3"
+      ],
+      "enumNames": [
+        "Australia Central (australiacentral)",
+        "Australia Central 2 (australiacentral2)",
+        "Australia East (australiaeast)",
+        "Australia Southeast (australiasoutheast)",
+        "Austria East (austriaeast)",
+        "Belgium Central (belgiumcentral)",
+        "Brazil South (brazilsouth)",
+        "Brazil Southeast (brazilsoutheast)",
+        "Canada Central (canadacentral)",
+        "Canada East (canadaeast)",
+        "Central India (centralindia)",
+        "Central US (centralus)",
+        "Chile Central (chilecentral)",
+        "Denmark East (denmarkeast)",
+        "East Asia (eastasia)",
+        "East US (eastus)",
+        "East US 2 (eastus2)",
+        "France Central (francecentral)",
+        "France South (francesouth)",
+        "Germany North (germanynorth)",
+        "Germany West Central (germanywestcentral)",
+        "Indonesia Central (indonesiacentral)",
+        "Israel Central (israelcentral)",
+        "Italy North (italynorth)",
+        "Japan East (japaneast)",
+        "Japan West (japanwest)",
+        "Jio India Central (jioindiacentral)",
+        "Jio India West (jioindiawest)",
+        "Korea Central (koreacentral)",
+        "Korea South (koreasouth)",
+        "Malaysia West (malaysiawest)",
+        "Mexico Central (mexicocentral)",
+        "New Zealand North (newzealandnorth)",
+        "North Central US (northcentralus)",
+        "North Europe (northeurope)",
+        "Norway East (norwayeast)",
+        "Norway West (norwaywest)",
+        "Poland Central (polandcentral)",
+        "Qatar Central (qatarcentral)",
+        "South Africa North (southafricanorth)",
+        "South Africa West (southafricawest)",
+        "South Central US (southcentralus)",
+        "South India (southindia)",
+        "Southeast Asia (southeastasia)",
+        "Spain Central (spaincentral)",
+        "Sweden Central (swedencentral)",
+        "Sweden South (swedensouth)",
+        "Switzerland North (switzerlandnorth)",
+        "Switzerland West (switzerlandwest)",
+        "UAE Central (uaecentral)",
+        "UAE North (uaenorth)",
+        "UK South (uksouth)",
+        "UK West (ukwest)",
+        "West Central US (westcentralus)",
+        "West Europe (westeurope)",
+        "West India (westindia)",
+        "West US (westus)",
+        "West US 2 (westus2)",
+        "West US 3 (westus3)"
+      ]
+    },
+    "advanced_settings": {
+      "type": "object",
+      "properties": {
+        "show_advanced_settings": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "dependencies": {
+        "show_advanced_settings": {
+          "oneOf": [
+            {
+              "properties": {
+                "show_advanced_settings": {
+                  "enum": [
+                    false
+                  ]
+                }
+              },
+              "required": []
+            },
+            {
+              "properties": {
+                "show_advanced_settings": {
+                  "enum": [
+                    true
+                  ]
+                },
+                "vnet_cidr": {
+                  "title": "VNet CIDR",
+                  "type": "string",
+                  "description": "Address space of the VNet. A private range (10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16) with a prefix between /16 and /24",
+                  "default": "10.0.0.0/16"
+                },
+                "subnet_newbits": {
+                  "title": "Subnet newbits",
+                  "type": "number",
+                  "description": "Bits added to the VNet prefix for each subnet. 8 gives /24 subnets in a /16. The public subnet comes first, the private subnet follows",
+                  "default": 8,
+                  "enum": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11,
+                    12
+                  ],
+                  "enumNames": [
+                    "1 bits",
+                    "2 bits",
+                    "3 bits",
+                    "4 bits",
+                    "5 bits",
+                    "6 bits",
+                    "7 bits",
+                    "8 bits (/24 subnets in a /16)",
+                    "9 bits",
+                    "10 bits",
+                    "11 bits",
+                    "12 bits"
+                  ]
+                },
+                "enable_nat_gateway": {
+                  "title": "Enable NAT gateway",
+                  "type": "boolean",
+                  "description": "Lets the private subnet reach the internet. Billed hourly while it exists",
+                  "default": false
+                },
+                "enable_flow_logs": {
+                  "title": "Enable flow logs",
+                  "type": "boolean",
+                  "description": "VNet flow logs to a storage account. Needs an existing Network Watcher in the region",
+                  "default": false
+                },
+                "flow_log_retention_days": {
+                  "title": "Flow log retention days",
+                  "type": "number",
+                  "description": "Days to keep flow logs, 0 keeps them forever",
+                  "default": 90,
+                  "enum": [
+                    0,
+                    7,
+                    30,
+                    60,
+                    90,
+                    180,
+                    365
+                  ],
+                  "enumNames": [
+                    "Forever",
+                    "7 days",
+                    "30 days",
+                    "60 days",
+                    "90 days",
+                    "180 days",
+                    "365 days"
+                  ]
+                },
+                "network_watcher_name": {
+                  "title": "Network Watcher name",
+                  "type": "string",
+                  "description": "Existing Network Watcher. Leave empty for NetworkWatcher_<location>"
+                },
+                "network_watcher_resource_group": {
+                  "title": "Network Watcher resource group",
+                  "type": "string",
+                  "description": "Resource group of the existing Network Watcher",
+                  "default": "NetworkWatcherRG"
+                },
+                "tags": {
+                  "title": "Tags",
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Additional tags for all resources",
+                  "default": {}
+                }
+              },
+              "required": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "title": "Azure Network (VNet)",
+  "dependencies": {}
+}

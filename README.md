@@ -1,93 +1,143 @@
-# tf-azure-network
+# Azure Network (VNet)
 
+A resource group with a virtual network, a `public` and a `private` subnet, and a network security group per subnet. A NAT gateway and VNet flow logs are optional and off by default.
 
+Network only: no compute, no database. It is the plain building block for workloads that you deploy afterwards. OpenTofu demo template. Standalone, no dependency on other repos. Compatible with Terraform.
 
-## Getting started
+## Architecture
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```mermaid
+flowchart TB
+  internet([Internet]) -.->|inbound denied by NSG| vnet
+  subgraph rg[Resource group]
+    subgraph vnet[VNet 10.0.0.0/16]
+      pub[public subnet + NSG]
+      priv[private subnet + NSG, no default outbound access]
+    end
+    nat[NAT gateway + public IP, optional]
+  end
+  priv -->|outbound, only if NAT is on| nat
+  nat --> internet
+  vnet -.->|flow logs, optional| nw[(Storage account via Network Watcher)]
 ```
-cd existing_repo
-git remote add origin https://gitlab.mm-homelab.org/stackguardian/tf-modules/tf-azure-network.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+- Resource group and VNet (default `10.0.0.0/16`)
+- Subnets `public` and `private` (default `/24` each), public first. The names match the AWS template, but Azure subnets have no type: the two tiers differ by NSG and NAT gateway
+- One network security group per subnet, each with an explicit rule that denies all inbound traffic from the internet
+- NAT gateway with a static public IP on the private subnet (optional)
+- VNet flow logs (optional) to a new storage account, using an existing Network Watcher
+- Azure subnets span the region, so there is no availability zone setting
 
-* [Set up project integrations](https://gitlab.mm-homelab.org/stackguardian/tf-modules/tf-azure-network/-/settings/integrations)
+## Security
 
-## Collaborate with your team
+- NSGs deny inbound traffic from the internet on both subnets. Users add allow rules with a lower priority number
+- The private subnet has no default outbound access: it reaches the internet only through the NAT gateway, if it is on
+- `vnet_cidr` must be a private range (RFC 1918) between `/16` and `/24`, and the module checks that the subnets fit
+- The flow log storage account enforces TLS 1.2 and HTTPS, forbids public blobs, denies network access except trusted Azure services and has blob soft delete
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Accepted checkov findings (documented inline in the code, all on the optional flow log resources):
 
-## Test and Deploy
+| Check | Reason |
+|---|---|
+| CKV_AZURE_33 | Queue service is not used |
+| CKV_AZURE_59 | The firewall denies all traffic except trusted Azure services, which Network Watcher needs to write the logs |
+| CKV2_AZURE_1 | Microsoft-managed keys, customer-managed keys are out of scope for the demo |
+| CKV2_AZURE_33 | Network Watcher writes through the trusted services bypass, a private endpoint is out of scope |
+| CKV2_AZURE_40 | Not verified that Network Watcher can write flow logs when shared key access is off, so the default is kept |
+| CKV2_AZURE_41 | SAS tokens are not used |
+| CKV_AZURE_12 | Retention is configurable (`flow_log_retention_days`), the default is 90 days and 0 keeps the logs forever |
 
-Use the built-in continuous integration in GitLab.
+The Trivy scan (`trivy config`) accepts findings with `#trivy:ignore` comments above the resource. The reason is written in the same line. Trivy evaluates the default values, so it checks the optional resources only when they are switched on (`--tf-vars`):
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+| Check | Reason |
+|---|---|
+| AVD-AZU-0057 | Access logging of the flow log storage account is out of scope for the demo |
+| AVD-AZU-0061 | Infrastructure (double) encryption is out of scope for the demo, data is encrypted with Microsoft-managed keys |
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+Sign in with `az login` and set `ARM_SUBSCRIPTION_ID` to the target subscription.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+cp terraform.tfvars.example terraform.tfvars
+tofu init
+tofu plan
+tofu apply
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## Using the network
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Deploy workloads into the `private` subnet (`private_subnet_id`) and resources that need public IPs into the `public` subnet. Turn on `enable_nat_gateway` when private workloads need outbound internet access.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Flow logs
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+`enable_flow_logs = true` creates a storage account and a flow log on the VNet. It uses the Network Watcher that Azure creates per region (default `NetworkWatcher_<location>` in `NetworkWatcherRG`). If it does not exist or has other names, the run fails when it looks it up. Set `network_watcher_name` and `network_watcher_resource_group` in that case. This module does not create a Network Watcher, because Azure allows only one per region and subscription.
 
-## License
-For open source projects, say how it is licensed.
+## Inputs
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| Name | Description | Default |
+|---|---|---|
+| `name_prefix` | Prefix for all resource names | `"demo"` |
+| `location` | Azure location | `"germanywestcentral"` |
+| `advanced_settings` | Object with the settings below, all optional | `{}` |
+
+`advanced_settings` attributes (shown as "Advanced Settings" in the StackGuardian form):
+
+| Name | Description | Default |
+|---|---|---|
+| `vnet_cidr` | Address space of the VNet. Private range (RFC 1918), prefix `/16` to `/24` | `"10.0.0.0/16"` |
+| `subnet_newbits` | Bits added to the VNet prefix for each subnet, 1 to 12. 8 gives `/24` subnets in a `/16`. The subnet prefix may not be longer than `/29` | `8` |
+| `enable_nat_gateway` | NAT gateway with a public IP for the private subnet | `false` |
+| `enable_flow_logs` | VNet flow logs to a storage account | `false` |
+| `flow_log_retention_days` | Days to keep flow logs, 0 to 365, 0 keeps them forever | `90` |
+| `network_watcher_name` | Existing Network Watcher, default `NetworkWatcher_<location>` | `null` |
+| `network_watcher_resource_group` | Resource group of the existing Network Watcher | `"NetworkWatcherRG"` |
+| `tags` | Additional tags for all resources | `{}` |
+
+## Outputs
+
+| Name | Description |
+|---|---|
+| `resource_group_name` | Name of the resource group |
+| `vnet_id` | ID of the virtual network |
+| `vnet_name` | Name of the virtual network |
+| `vnet_cidr` | Address space of the virtual network |
+| `public_subnet_id` | ID of the public subnet |
+| `private_subnet_id` | ID of the private subnet |
+| `public_subnet_cidr` | Address range of the public subnet |
+| `private_subnet_cidr` | Address range of the private subnet |
+| `nat_gateway_id` | ID of the NAT gateway, `null` when off |
+| `nat_public_ip` | Public IP of the NAT gateway, `null` when off |
+
+## Cost
+
+The resource group, VNet, subnets and NSGs have no hourly cost. The NAT gateway and its public IP are billed per hour while they exist, plus data processing, even when idle, so the NAT gateway is off by default. Flow logs are billed for the storage and for the Network Watcher flow log data.
+
+**Destroy after the demo:**
+
+```bash
+tofu destroy
+```
+
+## Tests
+
+The GitLab pipeline (`.gitlab-ci.yml`) lints every push. Merge requests into `development` or `main` also run
+validation, the checkov and Trivy scans and the unit tests. A tag runs all of these plus the integration tests, which deploy
+real resources and destroy them again, and then creates a release. Integration tests run only when the CI/CD variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_SUBSCRIPTION_ID` are set: an app registration with a federated credential for GitLab OIDC and the audience `api://AzureADTokenExchange`.
+
+In GitLab, the `unit-tests` job also publishes its results as a JUnit test report, which you find in the **Tests** tab of the pipeline and of the merge request. The script `ci/tofu-json-to-junit.py` converts the output of `tofu test -json` to JUnit XML.
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) runs the same jobs: every push, pull requests into `development` or `main`, and tags. Set the three `AZURE_*` values as repository variables; the app registration then needs a federated credential for GitHub.
+
+```bash
+tofu test -test-directory=tests/unit
+```
+
+Test cases: [tests/README.md](tests/README.md)
+
+## Development
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
