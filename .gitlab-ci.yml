@@ -1,0 +1,157 @@
+# Pipelines:
+# - Every push: lint (format check and tflint).
+# - Merge request into development or main: lint, validate, security scan and unit tests.
+# - Tag: lint, validate, security scan, unit tests, integration tests and a release.
+#   Integration tests run only when the AZURE_* CI/CD variables are set.
+
+variables:
+  GLAB_VERSION: "v1.127.0"
+  TRIVY_VERSION: "0.76.2"
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    # A branch with an open merge request already gets a merge request pipeline.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - lint
+  - validate
+  - test
+  - integration
+  - release
+
+.full_checks:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(development|main)$/
+    - if: $CI_COMMIT_TAG
+
+.tofu:
+  image:
+    name: ${CI_REGISTRY}/images/ci-opentofu:latest
+    entrypoint: [""]
+
+fmt:
+  extends: .tofu
+  stage: lint
+  script:
+    - tofu fmt -check -recursive -diff
+
+tflint:
+  stage: lint
+  image:
+    name: ${CI_REGISTRY}/images/ci-tflint:latest
+    entrypoint: [""]
+  cache:
+    key: tflint-plugins
+    paths:
+      - .tflint.d/
+  variables:
+    TFLINT_PLUGIN_DIR: $CI_PROJECT_DIR/.tflint.d
+  script:
+    # Fetch rule set plugins from the release page: tflint --init uses the GitHub API,
+    # which rate-limits unauthenticated requests per IP.
+    - |
+      awk -F'"' '/version *=/{v=$2} /source *=/{print $2" "v}' .tflint.hcl | while read -r source version; do
+        name="${source##*/}"
+        dir="$TFLINT_PLUGIN_DIR/$source/$version"
+        [ -x "$dir/$name" ] && continue
+        url="https://$source/releases/download/v$version"
+        mkdir -p "$dir" && cd "$dir"
+        wget -q "$url/${name}_linux_amd64.zip"
+        wget -q "$url/checksums.txt"
+        grep " ${name}_linux_amd64.zip\$" checksums.txt | sha256sum -c -
+        unzip -q "${name}_linux_amd64.zip"
+        rm -f "${name}_linux_amd64.zip" checksums.txt
+        cd "$CI_PROJECT_DIR"
+      done
+    - tflint --init
+    - tflint --format=compact
+
+validate:
+  extends: [.tofu, .full_checks]
+  stage: validate
+  script:
+    - tofu init -backend=false -input=false -test-directory=tests/integration
+    - tofu validate
+    - tofu validate -test-directory=tests/integration
+
+checkov:
+  extends: .full_checks
+  stage: validate
+  image:
+    name: ${CI_REGISTRY}/images/ci-checkov:latest
+    entrypoint: [""]
+  script:
+    - checkov --directory . --framework terraform --skip-path tests --compact --quiet
+
+trivy:
+  extends: .full_checks
+  stage: validate
+  image:
+    name: aquasec/trivy:$TRIVY_VERSION
+    entrypoint: [""]
+  script:
+    - trivy config --exit-code 1 --skip-dirs tests .
+
+unit-tests:
+  extends: [.tofu, .full_checks]
+  stage: test
+  script:
+    - tofu init -backend=false -input=false
+    # The JSON output is converted to a JUnit report for the pipeline's Tests tab.
+    # The tofu exit code is kept so a failed test still fails the job.
+    - |
+      rc=0
+      tofu test -test-directory=tests/unit -json > unit-tests.json || rc=$?
+      apk add --no-cache python3 > /dev/null
+      python3 ci/tofu-json-to-junit.py unit-tests.json junit-unit-tests.xml unit-tests
+      exit "$rc"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    reports:
+      junit: junit-*.xml
+
+integration-tests:
+  extends: .tofu
+  stage: integration
+  rules:
+    - if: $CI_COMMIT_TAG && $AZURE_CLIENT_ID && $AZURE_TENANT_ID && $AZURE_SUBSCRIPTION_ID
+  resource_group: integration
+  timeout: 1h
+  id_tokens:
+    AZURE_ID_TOKEN:
+      aud: api://AzureADTokenExchange
+  script:
+    - export ARM_USE_OIDC=true ARM_OIDC_TOKEN="$AZURE_ID_TOKEN"
+    - export ARM_CLIENT_ID="$AZURE_CLIENT_ID" ARM_TENANT_ID="$AZURE_TENANT_ID" ARM_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
+    - tofu init -input=false -test-directory=tests/integration
+    - tofu test -test-directory=tests/integration
+
+integration-skipped:
+  stage: integration
+  image: alpine:3.22
+  rules:
+    - if: $CI_COMMIT_TAG && $AZURE_CLIENT_ID && $AZURE_TENANT_ID && $AZURE_SUBSCRIPTION_ID
+      when: never
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Integration tests skipped. Set AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID to run them."
+
+release:
+  stage: release
+  image:
+    name: gitlab/glab:$GLAB_VERSION
+    entrypoint: [""]
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "Creating release $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: $CI_COMMIT_TAG
+    description: "Release $CI_COMMIT_TAG of $CI_PROJECT_NAME."
