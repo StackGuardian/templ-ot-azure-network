@@ -22,7 +22,7 @@ resource "azurerm_storage_account" "flow_logs" {
   #checkov:skip=CKV2_AZURE_1:Encrypted with Microsoft-managed keys, customer-managed keys are out of scope for the demo
   #checkov:skip=CKV2_AZURE_33:Network Watcher writes through the trusted services bypass of the firewall, a private endpoint is out of scope for the demo
   #checkov:skip=CKV2_AZURE_41:SAS tokens are not used
-  #checkov:skip=CKV2_AZURE_40:Not verified that Network Watcher can write flow logs when shared key access is off, so the default is kept
+  #checkov:skip=CKV2_AZURE_40:Shared key access stays on. Microsoft does not document whether Network Watcher can write flow logs without it, and this was not tested
   count = var.advanced_settings.enable_flow_logs ? 1 : 0
 
   name                            = "${substr(replace(var.name_prefix, "-", ""), 0, 12)}flow${random_string.suffix[0].result}"
