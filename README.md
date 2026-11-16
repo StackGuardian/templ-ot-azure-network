@@ -43,7 +43,7 @@ Accepted checkov findings (documented inline in the code, all on the optional fl
 | CKV_AZURE_59 | The firewall denies all traffic except trusted Azure services, which Network Watcher needs to write the logs |
 | CKV2_AZURE_1 | Microsoft-managed keys, customer-managed keys are out of scope for the demo |
 | CKV2_AZURE_33 | Network Watcher writes through the trusted services bypass, a private endpoint is out of scope |
-| CKV2_AZURE_40 | Not verified that Network Watcher can write flow logs when shared key access is off, so the default is kept |
+| CKV2_AZURE_40 | Shared key access stays on. Microsoft does not document whether Network Watcher can write flow logs without it, and this was not tested |
 | CKV2_AZURE_41 | SAS tokens are not used |
 | CKV_AZURE_12 | Retention is configurable (`flow_log_retention_days`), the default is 90 days and 0 keeps the logs forever |
 
